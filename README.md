@@ -29,7 +29,7 @@ theta_2 = -(q2 - Math.PI);
 ## Path Planning
 In order to avoid obstacles in this code, a RRT path planning is employed. In this method, robot tries to avoid obstacles in joint space. Hence, we can make sure it will never hit any obstacles in its way.
 
-![obstacle view](https://github.com/zaraanry/robotArmSimulator/blob/master/robotArmSimulator.html/obstacle_view.png)
+![obstacle view](https://github.com/zaraanry/arm_simulator/blob/master/arm_simulator.html/obstacle_view.png)
 
 ## Motion Actuator
 In order to transform robot position from joint space to cartesian space we just simply calculate each joint position node-by-node. The code example is demonstrated below:

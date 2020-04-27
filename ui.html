@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<meta charset="utf-8" />
+<head>
+    <title>Orbiter X</title>
+</head>
+
+<body>
+    <div style="float: left; height:100%; width: 450px;">
+        <canvas id="mainCanvas" width="400" height="400" style="float: left; border:1px solid #d3d3d3;">Your browser does not support the HTML5 canvas tag.</canvas>
+    </div>
+
+    <form name="myform" style="float: left; margin: -15px 0 0 0;">
+        <p>
+            <textarea name="outputtext" rows="20" cols="50"></textarea>
+        </p>
+
+        
+        <p>
+            <textarea name="url" cols="50"></textarea>
+        </p>
+        <p>
+            <input type="button" name=disconnectButton value="Disconnect" onClick="doDisconnect();">
+            <input type="button" name=connectButton value="Connect" onClick="doConnect();">
+        </p>
+
+        <p>
+            <span id="slider_title" style="font-size:small;">num of obstacles [20]</span><br/>
+            <input type="range" min="0" max="50" value="20" class="slider" id="numOfObstacle" oninput="obstacle_slider();">
+        </p>
+
+        <p>
+            <span id="method_title" style="font-size:small;">Path Planning Method:</span><br/>
+            <input type="radio" name="method" value="direct" id="rd_direct" checked="true" onclick="method_direct();"> direct<br/>
+            <input type="radio" name="method" value="rrt" id="rd_rrt" onclick="method_rrt();"> RRT<br/>
+            <input type="radio" name="method" value="rrts" id="rd_rrts" onclick="method_rrts();"> RRT*<br/>
+            <input type="radio" name="method" value="astar" id="rd_astar" onclick="method_astar();"> A*<br/>
+        </p>
+    </form>
+
+    <script language="javascript" type="text/javascript">
+        slider = document.getElementById("numOfObstacle");
+        slider_label = document.getElementById("slider_title");
+        function obstacle_slider()
+        {
+            slider_label.innerHTML = "num of obstacles [" + slider.value + "]";
+            websocket.send('slider_' + slider.value);
+        }
+
+        function method_direct()
+        {
+            websocket.send('method_direct');
+        }
+
+        function method_rrt()
+        {
+            websocket.send('method_rrt');
+        }
+
+        function method_rrts()
+        {
+            websocket.send('method_rrts');
+        }
+
+        function method_astar()
+        {
+            websocket.send('method_astar');
+        }
+
+        function init()
+        {
+            document.myform.url.value = "ws://localhost:8000/"
+            document.myform.disconnectButton.disabled = true;
+        }
+
+        function doConnect()
+        {
+            websocket = new WebSocket(document.myform.url.value);
+            websocket.onopen = function(evt) { onOpen(evt) };
+            websocket.onclose = function(evt) { onClose(evt) };
+            websocket.onmessage = function(evt) { onMessage(evt) };
+            websocket.onerror = function(evt) { onError(evt) };
+        }
+
+        function onOpen(evt)
+        {
+            writeToScreen("connected\n");
+            document.myform.connectButton.disabled = true;
+            document.myform.disconnectButton.disabled = false;
+            is_running = true;
+
+            websocket.send('slider_' + slider.value);
+            if (document.getElementById("rd_direct").checked)
+                websocket.send('method_direct');
+            if (document.getElementById("rd_rrt").checked)
+                websocket.send('method_rrt');
+            if (document.getElementById("rd_rrts").checked)
+                websocket.send('method_rrts');
+            if (document.getElementById("rd_astar").checked)
+                websocket.send('method_astar');
+
+            run_on_loop();
+        }
+
+        function onClose(evt)
+        {
+            writeToScreen("disconnected\n");
+            document.myform.connectButton.disabled = false;
+            document.myform.disconnectButton.disabled = true;
+            is_running = false;
+        }
+
+        function onMessage(evt)
+        {
+            process_context(JSON.parse(evt.data));
+        }
+
+        function onError(evt)
+        {
+            is_running = false;
+            writeToScreen('error: ' + evt.data + '\n');
+            websocket.close();
+            document.myform.connectButton.disabled = false;
+            document.myform.disconnectButton.disabled = true;
+        }
+
+        function writeToScreen(message)
+        {
+            document.myform.outputtext.value += message + '\n';
+            document.myform.outputtext.scrollTop = document.myform.outputtext.scrollHeight;
+        }
+
+        function doDisconnect() {
+            websocket.close();
+        }
+
+        let sleep_time = 100;
+        var is_running = true;
+        function run_on_loop() {
+            if (is_running) {
+                websocket.send('get');
+                setTimeout(run_on_loop, sleep_time);
+            }
+        }
+
+        var mainCanvas = document.getElementById("mainCanvas");
+        var ctx_main = mainCanvas.getContext("2d");
+
+        function process_context(context) {
+            draw_context(context.drawable, context.center_draw, context.clear_draw);
+            show_info(context.extra_info);
+        }
+
+        function draw_ellipse(x, y, rx, ry, color, fill, is_center) {
+            ctx_main.beginPath();
+
+            if (color == null)
+                color = '#eee';
+
+            if (fill == null)
+                fill = true;
+
+            if (fill)
+                ctx_main.fillStyle = color;
+            else
+                ctx_main.strokeStyle = color;
+            
+            if (rx == null)
+                rx = 10
+            if (ry == null)
+                ry = rx
+
+            if (is_center) {
+                x += 200
+                y += 200
+            }
+
+            ctx_main.ellipse(x, y, rx, ry, 360, 0, 360, false);
+            
+            if (fill)
+                ctx_main.fill();
+            else
+                ctx_main.stroke();
+        }
+
+        function draw_rect(x, y, w, h, color, fill, is_center) {
+            ctx_main.beginPath();
+
+            if (color == null)
+                color = '#eee';
+
+            if (fill == null)
+                fill = true;
+
+            if (fill)
+                ctx_main.fillStyle = color;
+            else
+                ctx_main.strokeStyle = color;
+            
+            if (w == null)
+                w = 10
+            if (h == null)
+                h = 10
+
+            if (is_center) {
+                x += 200
+                y += 200
+            }
+
+            ctx_main.rect(x, y, w, h);
+            
+            if (fill)
+                ctx_main.fill();
+            else
+                ctx_main.stroke();
+        }
+
+        function draw_lines(points, color, fill, is_center) {
+            ctx_main.beginPath();
+
+            if (color == null)
+                color = '#eee';
+
+            if (fill == null)
+                fill = true;
+
+            if (fill)
+                ctx_main.fillStyle = color;
+            else
+                ctx_main.strokeStyle = color;
+            
+            var is_first = true;
+            points.forEach(function (p) {
+                var x = p.x;
+                var y = p.y;
+
+                if (is_center) {
+                    x += 200
+                    y += 200
+                }
+
+                if (is_first)
+                    ctx_main.moveTo(x, y);
+                else
+                    ctx_main.lineTo(x, y);
+
+                is_first = false;
+            });
+            
+            if (fill)
+                ctx_main.fill();
+            else
+                ctx_main.stroke();
+        }
+
+        draw_grid = true;
+        function draw_context(context, center_draw, clear_draw) {
+            if (context == null)
+                return;
+            if (center_draw == null)
+                center_draw = true;
+            
+            if (clear_draw == null || clear_draw)
+                ctx_main.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+
+            if (draw_grid)
+            {
+                ctx_main.strokeStyle = "#ccc";
+                ctx_main.beginPath();
+                ctx_main.moveTo(0, 200);
+                ctx_main.lineTo(400, 200);
+                ctx_main.stroke();
+
+                ctx_main.beginPath();
+                ctx_main.moveTo(200, 0);
+                ctx_main.lineTo(200, 400);
+                ctx_main.stroke();
+
+                ctx_main.strokeStyle = "#cfc";
+                ctx_main.beginPath();
+                ctx_main.moveTo(0, 100);
+                ctx_main.lineTo(400, 100);
+                ctx_main.stroke();
+
+                ctx_main.beginPath();
+                ctx_main.moveTo(100, 0);
+                ctx_main.lineTo(100, 400);
+                ctx_main.stroke();
+            }
+
+            Object.keys(context).forEach(function (item) {
+                c = context[item];
+                shape = context[item].shape;
+
+                if (shape == null || shape == 'ellipse')
+                    draw_ellipse(c.x, c.y, c.rx, c.ry, c.color, c.fill, center_draw);
+                if (shape == 'rect')
+                    draw_rect(c.x, c.y, c.w, c.h, c.color, c.fill, center_draw);
+                if (shape == 'lines')
+                    draw_lines(c.points, c.color, c.fill, center_draw);
+            });
+        }
+
+        function show_info(context) {
+            if (context == null)
+                return;
+            text = '';
+            Object.keys(context).forEach(function (item) {
+                text +=  item + ' = ' + context[item] + '\n';
+            });
+            document.myform.outputtext.value = text;
+        }
+
+        window.addEventListener("load", init, false);
+      </script>
+</body>
+
+</html> 
